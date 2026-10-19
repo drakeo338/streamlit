@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import type { RefObject } from "react"
+
 import { act, screen, waitFor } from "@testing-library/react"
 import { userEvent } from "@testing-library/user-event"
 
@@ -1796,6 +1798,47 @@ describe("ChatInput widget", () => {
 
     expect(mockController.start).toHaveBeenCalledTimes(1)
     expect(mockController.cancel).not.toHaveBeenCalled()
+  })
+
+  it("has the waveform container attached when recording starts from the expanded layout", async () => {
+    const user = userEvent.setup()
+    const mockController = createMockWaveformController()
+    useWaveformControllerMock.mockReturnValue(mockController)
+
+    // A configured pixel height renders the expanded (toolbar row) layout.
+    const props = getProps(
+      { acceptAudio: true },
+      { heightConfig: { pixelHeight: 200 } }
+    )
+    const { rerender } = render(<ChatInput {...props} />)
+
+    const containerRef = useWaveformControllerMock.mock.calls.at(-1)?.[0]
+      .containerRef as RefObject<HTMLDivElement | null>
+    const containerBeforeStart = containerRef.current
+    expect(containerBeforeStart).not.toBeNull()
+
+    let containerAtStart: HTMLDivElement | null = null
+    vi.mocked(mockController.start).mockImplementation(() => {
+      containerAtStart = containerRef.current
+      return Promise.resolve()
+    })
+
+    await user.click(screen.getByTestId("stChatInputMicButton"))
+
+    // start() is invoked before the layout switches, so the container must
+    // already be mounted at that point.
+    expect(containerAtStart).toBe(containerBeforeStart)
+
+    // Switch to the recording state: the same element stays mounted.
+    useWaveformControllerMock.mockReturnValue({
+      ...mockController,
+      state: "recording",
+    })
+    rerender(<ChatInput {...props} fragmentId="rerender" />)
+
+    expect(screen.getByTestId("stChatInputCancelButton")).toBeInTheDocument()
+    expect(containerRef.current).toBe(containerBeforeStart)
+    expect(containerBeforeStart).toBeInTheDocument()
   })
 
   it("approves an in-progress recording", async () => {

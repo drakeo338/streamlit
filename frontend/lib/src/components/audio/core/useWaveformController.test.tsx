@@ -571,8 +571,7 @@ describe("useWaveformController", () => {
       expect(createMock).toHaveBeenCalledTimes(1)
       expect(createMock.mock.calls[0][0].container).toBe(firstContainer)
 
-      // The host unmounted the original container and mounted a new element
-      // in its place (e.g. ChatInput switching between layouts).
+      // The host replaced the container element with a new one.
       const secondContainer = document.createElement("div")
       mockContainerRef.current = secondContainer
 

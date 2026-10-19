@@ -1113,6 +1113,14 @@ function ChatInput({
             </StyledTextareaWrapper>
           )}
 
+          {/* Waveform - shown inline when recording. Rendered outside the
+              layout conditional below so the same element stays mounted
+              (hidden while not recording) and is attached when the recording
+              starts from either layout. */}
+          <StyledWaveformContainer isRecording={isRecording}>
+            <StyledChatAudioWave ref={waveformContainerRef} />
+          </StyledWaveformContainer>
+
           {/* Toolbar/buttons section - wrapped in StyledToolbarRow when expanded */}
           {hasExpandedHeight && !isRecording ? (
             <StyledToolbarRow>
@@ -1207,11 +1215,6 @@ function ChatInput({
                   />
                 )}
               </StyledLeftCluster>
-
-              {/* Waveform - shown inline when recording */}
-              <StyledWaveformContainer isRecording={isRecording}>
-                <StyledChatAudioWave ref={waveformContainerRef} />
-              </StyledWaveformContainer>
 
               <StyledRightCluster>
                 {isRecording ? (
