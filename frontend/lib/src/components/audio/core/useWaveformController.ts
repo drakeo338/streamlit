@@ -81,6 +81,8 @@ export function useWaveformController({
   const playerRef = useRef<WaveSurferPlayer | null>(null)
   const eventsRef = useRef<WaveformControllerEvents>(events)
   const isInitializedRef = useRef(false)
+  // The container element WaveSurfer was (or is being) created against
+  const initializedContainerRef = useRef<HTMLDivElement | null>(null)
   const initPromiseRef = useRef<Promise<void> | null>(null)
   const initGenerationRef = useRef(0)
   const readyResolversRef = useRef<Set<ReadyResolver>>(new Set())
@@ -111,6 +113,7 @@ export function useWaveformController({
     }
 
     isInitializedRef.current = false
+    initializedContainerRef.current = null
     initPromiseRef.current = null
     initGenerationRef.current += 1
     isPlaybackModeRef.current = false
@@ -189,6 +192,7 @@ export function useWaveformController({
       return Promise.resolve()
     }
 
+    initializedContainerRef.current = container
     const generation = initGenerationRef.current
     const initPromise = (async (): Promise<void> => {
       // destroy() drops this promise and starts a replacement when theme or
@@ -318,14 +322,29 @@ export function useWaveformController({
     theme.colors.secondaryBg,
   ])
 
+  // WaveSurfer is bound to the element it was created with. If the host
+  // swapped the container element since, tear down and re-create it on the
+  // current one.
+  const ensureInitialized = useCallback(async (): Promise<void> => {
+    const container = containerRef.current
+    if (
+      container &&
+      initializedContainerRef.current &&
+      initializedContainerRef.current !== container
+    ) {
+      destroy()
+    }
+    if (!isInitializedRef.current) {
+      await initializeWaveSurfer()
+    }
+  }, [containerRef, destroy, initializeWaveSurfer])
+
   const start = useCallback(async (): Promise<void> => {
     if (currentState === "recording") {
       return
     }
 
-    if (!isInitializedRef.current) {
-      await initializeWaveSurfer()
-    }
+    await ensureInitialized()
 
     if (!recordBackendRef.current) {
       throw new Error("Record backend not initialized")
@@ -346,7 +365,7 @@ export function useWaveformController({
     setCurrentBlob(null)
     setIsPlaybackPlaying(false)
     void eventsRef.current.onRecordStart?.()
-  }, [currentState, initializeWaveSurfer, theme.colors.primary])
+  }, [currentState, ensureInitialized, theme.colors.primary])
 
   const resetPlayer = useCallback((): void => {
     if (playerRef.current && wavesurferRef.current) {
@@ -507,9 +526,7 @@ export function useWaveformController({
       },
 
       load: async (source: Blob | ArrayBuffer | string): Promise<void> => {
-        if (!isInitializedRef.current) {
-          await initializeWaveSurfer()
-        }
+        await ensureInitialized()
         if (!playerRef.current) {
           throw new Error("Player not initialized")
         }
@@ -526,7 +543,7 @@ export function useWaveformController({
         return playerRef.current?.getDuration() ?? 0
       },
     }),
-    [enterPlaybackMode, initializeWaveSurfer]
+    [enterPlaybackMode, ensureInitialized]
   )
 
   const setEventHandlers = useCallback(

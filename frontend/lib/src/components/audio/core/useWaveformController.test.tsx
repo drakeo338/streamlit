@@ -563,6 +563,46 @@ describe("useWaveformController", () => {
       expect(mockWaveSurfer.setOptions).toHaveBeenCalled()
     })
 
+    it("re-creates WaveSurfer on the current container when the container element changes", async () => {
+      const { result } = await renderInitialized()
+      const createMock = (await import("wavesurfer.js")).default
+        .create as ReturnType<typeof vi.fn>
+      const firstContainer = mockContainerRef.current
+      expect(createMock).toHaveBeenCalledTimes(1)
+      expect(createMock.mock.calls[0][0].container).toBe(firstContainer)
+
+      // The host unmounted the original container and mounted a new element
+      // in its place (e.g. ChatInput switching between layouts).
+      const secondContainer = document.createElement("div")
+      mockContainerRef.current = secondContainer
+
+      await act(async () => {
+        await result.current.start()
+      })
+
+      expect(mockWaveSurfer.destroy).toHaveBeenCalledTimes(1)
+      expect(createMock).toHaveBeenCalledTimes(2)
+      expect(createMock.mock.calls[1][0].container).toBe(secondContainer)
+      expect(mockRecordPlugin.startRecording).toHaveBeenCalledTimes(1)
+    })
+
+    it("re-creates WaveSurfer on the current container when playback.load() is called after the container changes", async () => {
+      const { result } = await renderInitialized()
+      const createMock = (await import("wavesurfer.js")).default
+        .create as ReturnType<typeof vi.fn>
+
+      const secondContainer = document.createElement("div")
+      mockContainerRef.current = secondContainer
+
+      await act(async () => {
+        await result.current.playback.load(new Blob(["audio"]))
+      })
+
+      expect(mockWaveSurfer.destroy).toHaveBeenCalledTimes(1)
+      expect(createMock).toHaveBeenCalledTimes(2)
+      expect(createMock.mock.calls[1][0].container).toBe(secondContainer)
+    })
+
     it("does nothing when start() is called while already recording", async () => {
       const { result } = await renderInitialized()
 
